@@ -76,38 +76,57 @@ Function Get-ImageDateTaken
         $date = Get-ExifItem -ImageFile $fileName -ExifID 36867
         If ($date) {
             $result = $date.ToString('yyyyMMdd_HHmmss')
-            Write-Log "$fileName  CreationDate: $result"
+            Write-Log "$fileName  DateTaken: $result" -DebugMode
             Return $result
         } Else { 
-            Write-Log "$fileName  ERROR getting exif item 36867 - probably doesn't exist"
+            Write-Log "$fileName  ERROR getting exif item 36867 - probably doesn't exist" -DebugMode
             Return $false
         }
     }
 }
 
-Function PrefixAllJpegsWithDateTaken($folderToRenameFilesIn)
+Function Get-JpegData
 {
-    foreach ($filepath in [System.IO.Directory]::GetFiles($folderToRenameFilesIn))
-    {
-        $file = New-Object System.IO.FileInfo($filepath);
-        $filename = $file.Name
-        
-        $datePrefix = $file.LastWriteTime.ToString('yyyyMMdd_HHmmss')
-        
-        if ($filename.EndsWith(".jpg"))
-        {
-           $dateTaken = GetDateTakenForFilename($filepath)
-           echo "Date Taken: $dateTaken"
-           $datePrefix = $dateTaken
+    Param
+    (
+        [Parameter(Mandatory=$true)]
+        $folderToRenameFilesIn
+    )
+
+    gci -Path $folderToRenameFilesIn -Filter *.jpg | % {
+        #$newStamp = Get-ImageDateTaken -fileName $_.FullName
+        #$currentStamp = $_.BaseName
+
+        #$m = $_.BaseName -match "\d{8}_\d{6}"
+        If     ($_.BaseName -match "\d{8}_\d{6}")                         { $FileNameStamp = $Matches[0] }
+        ElseIf ($_.BaseName -match "\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}") { $FileNameStamp = $Matches[0] -replace "-","" }
+        Else { $FileNameStamp = $false }
+
+        $prop = [ordered]@{
+            FileName      = $_.Name
+            DateTaken      = Get-ImageDateTaken -fileName $_.FullName
+            FileNameStamp  = $FileNameStamp
+            LastWriteTime = $_.LastWriteTime.ToString('yyyyMMdd_HHmmss')
+            #Path           = $_.Directory
         }
+        $obj = New-Object -TypeName psobject -Property $prop
+
+        # Prefer DateTaken if it exists
+        If ($obj.DateTaken)                                                                { $obj | Add-Member -Type NoteProperty -Name Preferred -Value DateTaken }
         
-        $targetPath = $folderToRenameFilesIn + '\' + $datePrefix + $filename
-        echo $targetPath
-        [System.IO.File]::Copy($filepath, $targetPath)
-       # $newfile = New-Object System.IO.FileInfo($targetPath);
-       # $newCreationDate = $newfile.CreationTime.ToString('yyyyMMdd-hhmmss')
-       # $newLastWriteTime = $newfile.LastWriteTime.ToString('yyyyMMdd-hhmmss') 
-       # echo "Original Filename: $filename  Creation Time: $date  Last Write Time:  $lastWriteTime Target Path: $targetPath New File Creation Time: $newCreationDate New File Last Write Time:  $newLastWriteTime"
+        # Prefer FileNameStamp if it's less than LastWriteTime[0]
+        ElseIf (($obj.FileNameStamp -split "_")[0] -lt ($obj.LastWriteTime -split "_")[0]) { $obj | Add-Member -Type NoteProperty -Name Preferred -Value FileNameStamp }
+
+        # Prefer FileNameStamp if it's less than LastWriteTime[0,1]
+        ElseIf (($obj.FileNameStamp -split "_")[0] -eq ($obj.LastWriteTime -split "_")[0] `
+          -and (($obj.FileNameStamp -split "_")[1] -lt ($obj.LastWriteTime -split "_")[1])){ $obj | Add-Member -Type NoteProperty -Name Preferred -Value FileNameStamp }
+        
+        # Last resort is prefer LastWriteTime
+        Else { $obj | Add-Member -Type NoteProperty -Name Preferred -Value LastWriteTime }
+
+        $obj | Add-Member -Type NoteProperty -Name Year -Value (($obj.($obj.Preferred) -split "_")[0]).substring(0,4)
+        $obj | Add-Member -Type NoteProperty -Name Month -Value (($obj.($obj.Preferred) -split "_")[0]).substring(4,2)
+        Return $obj
     }
 }
 
@@ -122,9 +141,9 @@ $Global:isDebug = $false
 Write-Log "Debug Message" -DebugMode
 Write-Log "Regular Message"
 
-#PrefixAllJpegsWithDateTaken("d:\videos\test")
-(gci -Path "E:\Pictures\Camera\Testing").FullName | Get-ImageDateTaken
+$obj = Get-JpegData -folderToRenameFilesIn "E:\Pictures\Camera"
 
+$obj | FT
 
 ##$dateTakenForFilename = GetDateTakenForFilename("D:\videos\test\153-P1040727.jpg")
 ##echo $dateTakenForFilename
