@@ -125,4 +125,4 @@ Function Get-ExifItem
     }
 }
 
-(gci -Path $Path -Filter $Extension).FullName # | Get-ExifItem
+Get-ExifItem -Image (gci -Path $Path -Filter $Extension).FullName

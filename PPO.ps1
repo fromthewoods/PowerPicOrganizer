@@ -40,8 +40,8 @@ Function Get-ExifItem
         Try { 
             $ExifDT = $Img.GetPropertyItem($ExifID)
         } Catch {
-            #$_.Exception.GetType().FullName
-            Write-Output "Error getting exif item $ExifID - probably doesn't exist"
+            #$_.Exception
+            #Write-Log "$ImageFile :: Error getting exif item $ExifID - probably doesn't exist"
             Return $false
         }
 
@@ -74,15 +74,18 @@ Function Get-ImageDateTaken
     Process
     {
         $date = Get-ExifItem -ImageFile $fileName -ExifID 36867
-        If ($date) {Return $date.ToString('yyyyMMdd_HHmmss')}
+        If ($date) {
+            $result = $date.ToString('yyyyMMdd_HHmmss')
+            Write-Log "$fileName  CreationDate: $result"
+            Return $result
+        } Else { 
+            Write-Log "$fileName  ERROR getting exif item 36867 - probably doesn't exist"
+            Return $false
+        }
     }
 }
 
-(gci -Path "E:\Pictures\Camera\Testing").FullName | Get-ImageDateTaken
- ##$dateTakenForFilename = GetDateTakenForFilename("D:\videos\test\153-P1040727.jpg")
-##echo $dateTakenForFilename
-
- Function PrefixAllJpegsWithDateTaken($folderToRenameFilesIn)
+Function PrefixAllJpegsWithDateTaken($folderToRenameFilesIn)
 {
     foreach ($filepath in [System.IO.Directory]::GetFiles($folderToRenameFilesIn))
     {
@@ -108,4 +111,20 @@ Function Get-ImageDateTaken
     }
 }
 
+$Global:log=@{
+    Location = "D:\Scripts\Logs\"
+    Name = "$($MyInvocation.MyCommand.Name)_$(Get-Date -UFormat %Y-%m-%d.%H-%M-%S)"
+    Extension = ".log"
+}
+$Global:isDebug = $false
+#$log.Location + $log.Name + $log.Extension
+
+Write-Log "Debug Message" -DebugMode
+Write-Log "Regular Message"
+
 #PrefixAllJpegsWithDateTaken("d:\videos\test")
+(gci -Path "E:\Pictures\Camera\Testing").FullName | Get-ImageDateTaken
+
+
+##$dateTakenForFilename = GetDateTakenForFilename("D:\videos\test\153-P1040727.jpg")
+##echo $dateTakenForFilename
