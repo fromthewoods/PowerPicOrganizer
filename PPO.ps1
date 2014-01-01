@@ -1,4 +1,19 @@
-﻿<#
+﻿$month = @{
+    01 = "01 Jan"
+    02 = "02 Feb"
+    03 = "03 Mar"
+    04 = "04 Apr"
+    05 = "05 May"
+    06 = "06 Jun"
+    07 = "07 Jul"
+    08 = "08 Aug"
+    09 = "09 Sep"
+    10 = "10 Oct"
+    11 = "11 Nov"
+    12 = "12 Dec"
+}
+
+<#
 .Synopsis
    Returns an single item of Generic Exif data
 .DESCRIPTION
@@ -107,7 +122,7 @@ Function Get-JpegData
             DateTaken      = Get-ImageDateTaken -fileName $_.FullName
             FileNameStamp  = $FileNameStamp
             LastWriteTime = $_.LastWriteTime.ToString('yyyyMMdd_HHmmss')
-            #Path           = $_.Directory
+            Path           = $_.Directory
         }
         $obj = New-Object -TypeName psobject -Property $prop
 
@@ -141,9 +156,15 @@ $Global:isDebug = $false
 Write-Log "Debug Message" -DebugMode
 Write-Log "Regular Message"
 
-$obj = Get-JpegData -folderToRenameFilesIn "E:\Pictures\Camera"
+$JpegData = Get-JpegData -folderToRenameFilesIn "E:\Pictures\Camera"
 
-$obj | FT
+$JpegData | % {
+    If ($_.Preferred -eq 'DateTaken') {
+        Write-Log "$($_.Path)\$($_.FileName) -Destination $($_.Path)\$($_.Year)\$($month[[int]$($_.month)])\$($_.DateTaken)"
+        #Move-Item -Path ($_.Path + "\" + $_.FileName) -Destination ($_.Path + "\" + $_.Year + "\" + $month[($_.month)] + "\" + $_.DateTaken) }
+    }
+}
 
+Write-Host "Done"
 ##$dateTakenForFilename = GetDateTakenForFilename("D:\videos\test\153-P1040727.jpg")
 ##echo $dateTakenForFilename
