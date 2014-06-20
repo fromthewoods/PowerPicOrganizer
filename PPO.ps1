@@ -38,10 +38,10 @@ Function Get-JpegData
 
         $prop = [ordered]@{
             FileName      = $Item.Name
-            DateTaken      = (Get-Exif $Item.FullName).DateTakenFS
-            FileNameStamp  = $FileNameStamp
+            DateTaken     = (Get-Exif $Item.FullName).DateTakenFS
+            FileNameStamp = $FileNameStamp
             LastWriteTime = $Item.LastWriteTime.ToString('yyyyMMdd_HHmmss')
-            Path           = $Item.Directory
+            Path          = $Item.Directory
         }
         $obj = New-Object -TypeName psobject -Property $prop
 
@@ -97,8 +97,14 @@ $JpegData | % {
         -Status "Processed: $i of $($JpegData.Count)" `
         -PercentComplete (($i / $JpegData.Count) * 100)
 
-    $SourcePath = "$($_.Path)\$($_.FileName)"
-    $Destination = "$($_.Path)\$($_.Year)\$($month[[int]$($_.month)])\$($_.$($_.Preferred)).jpg"
+    $SourcePath     = "$($_.Path)\$($_.FileName)"
+    $DestinationDir = "$($_.Path)\$($_.Year)\$($month[[int]$($_.month)])\"
+    $Destination    = "$($_.Path)\$($_.Year)\$($month[[int]$($_.month)])\$($_.$($_.Preferred)).jpg"
+
     Write-Log "$SourcePath -Destination $Destination"
-    Move-Item -Path $SourcePath -Destination $Destination -WhatIf
+
+    If (!(Test-Path $DestinationDir)) { mkdir $DestinationDir | Out-Null }
+    #If (  Test-Path $Destination )
+    #{}
+    Move-Item -Path $SourcePath -Destination $Destination
 }
