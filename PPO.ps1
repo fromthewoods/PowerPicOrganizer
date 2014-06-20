@@ -13,116 +13,35 @@
     12 = "12 Dec"
 }
 
-<#
-.Synopsis
-   Returns an single item of Generic Exif data
-.DESCRIPTION
-   Returns the data part of a single EXIF property item -not the type. 
-.EXAMPLE
-   Get-ExifItem -ImageFile "E:\Pictures\Camera\Testing\Date.jpg" -ExifID 36867
-   Returns the Camera model string
-.EXAMPLE
-   (gci -Path "E:\Pictures\Camera\Testing").FullName | Get-ExifItem -ExifID 36867
-.Parameter ImageFile
-   The image from which the data will be read 
-.Parameter ExifID
-   The ID of the required data field. 
-   The module defines constants with names beginning $ExifID for the most used ones.
-   List of ID's and definitions: http://msdn.microsoft.com/en-us/library/ms534416.aspx 
-#>
-
-Function Get-ExifItem
-{
-    Param
-    (
-        [Parameter(Mandatory=$true,
-                   ValueFromPipeline=$true)]
-        $ImageFile
-    ,
-        [Parameter(Mandatory=$true)]
-        $ExifID
-    )
-    Process
-    {
-        $FileStream=New-Object System.IO.FileStream($ImageFile,
-                                                    [System.IO.FileMode]::Open,
-                                                    [System.IO.FileAccess]::Read,
-                                                    [System.IO.FileShare]::Read,
-                                                    1024,     # Buffer size
-                                                    [System.IO.FileOptions]::SequentialScan
-                                                    )
-        $Img = [System.Drawing.Imaging.Metafile]::FromStream($FileStream)
-        Try { 
-            $ExifDT = $Img.GetPropertyItem($ExifID)
-        } Catch {
-            #$_.Exception
-            #Write-Log "$ImageFile :: Error getting exif item $ExifID - probably doesn't exist"
-            Return $false
-        }
-
-        $ExifDtString=[System.Text.Encoding]::ASCII.GetString($ExifDT.Value)
-                
-        $DateTime=[datetime]::ParseExact($ExifDtString,"yyyy:MM:dd HH:mm:ss`0",$Null)
-        $FileStream.Close(); $Img.Dispose()
-        Return $DateTime
-    }
-}
-
-<#
-.Synopsis
-   Short description
-.DESCRIPTION
-   Long description
-.EXAMPLE
-   Example of how to use this cmdlet
-.EXAMPLE
-   Another example of how to use this cmdlet
-#>
-Function Get-ImageDateTaken
-{
-    Param
-    (
-        [Parameter(Mandatory=$true,
-                   ValueFromPipeline=$true)]
-        $fileName
-    )
-    Process
-    {
-        $date = Get-ExifItem -ImageFile $fileName -ExifID 36867
-        If ($date) {
-            $result = $date.ToString('yyyyMMdd_HHmmss')
-            Write-Log "$fileName  DateTaken: $result" -DebugMode
-            Return $result
-        } Else { 
-            Write-Log "$fileName  ERROR getting exif item 36867 - probably doesn't exist" -DebugMode
-            Return $false
-        }
-    }
-}
 
 Function Get-JpegData
 {
     Param
     (
         [Parameter(Mandatory=$true)]
-        $folderToRenameFilesIn
+        $SourceDir
     )
+    $i=0
+    $Filter = @("*.jpg","*.jpeg")
+    $jpegs = gci -Path $SourceDir -Include $Filter
+    $hash = @()
+    Foreach ($jpeg in $jpegs) {
+        $i++
+        Write-Progress -Activity "Reading files..." `
+            -Status "Processed: $i of $($jpegs.Count)" `
+            -PercentComplete (($i / $jpegs.Count) * 100)
 
-    gci -Path $folderToRenameFilesIn -Filter *.jpg | % {
-        #$newStamp = Get-ImageDateTaken -fileName $_.FullName
-        #$currentStamp = $_.BaseName
-
-        #$m = $_.BaseName -match "\d{8}_\d{6}"
-        If     ($_.BaseName -match "\d{8}_\d{6}")                         { $FileNameStamp = $Matches[0] }
-        ElseIf ($_.BaseName -match "\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}") { $FileNameStamp = $Matches[0] -replace "-","" }
+        #$m = $jpeg.BaseName -match "\d{8}_\d{6}"
+        If     ($jpeg.BaseName -match "\d{8}_\d{6}")                         { $FileNameStamp = $Matches[0] }
+        ElseIf ($jpeg.BaseName -match "\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}") { $FileNameStamp = $Matches[0] -replace "-","" }
         Else { $FileNameStamp = $false }
 
         $prop = [ordered]@{
-            FileName      = $_.Name
-            DateTaken      = Get-ImageDateTaken -fileName $_.FullName
+            FileName      = $jpeg.Name
+            DateTaken      = (Get-Exif $jpeg.FullName).DateTakenFS
             FileNameStamp  = $FileNameStamp
-            LastWriteTime = $_.LastWriteTime.ToString('yyyyMMdd_HHmmss')
-            Path           = $_.Directory
+            LastWriteTime = $jpeg.LastWriteTime.ToString('yyyyMMdd_HHmmss')
+            Path           = $jpeg.Directory
         }
         $obj = New-Object -TypeName psobject -Property $prop
 
@@ -141,30 +60,43 @@ Function Get-JpegData
 
         $obj | Add-Member -Type NoteProperty -Name Year -Value (($obj.($obj.Preferred) -split "_")[0]).substring(0,4)
         $obj | Add-Member -Type NoteProperty -Name Month -Value (($obj.($obj.Preferred) -split "_")[0]).substring(4,2)
-        Return $obj
+        $hash += $obj
     }
+    $hash
 }
 
+########
+# MAIN #
+########
+
+#Locate the invocation directory and cd to it to be able to load local functions.
+$parentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$includesDir = "$parentDir\"
+cd $includesDir
+
+# Include local config and functions using call operator
+. .\Get-Exif.ps1
+
+$Global:isDebug = $false
 $Global:log=@{
     Location = "D:\Scripts\Logs\"
     Name = "$($MyInvocation.MyCommand.Name)_$(Get-Date -UFormat %Y-%m-%d.%H-%M-%S)"
     Extension = ".log"
 }
-$Global:isDebug = $false
-#$log.Location + $log.Name + $log.Extension
 
-Write-Log "Debug Message" -DebugMode
-Write-Log "Regular Message"
+$JpegData = Get-JpegData -SourceDir "E:\Pictures\Camera\*"
 
-$JpegData = Get-JpegData -folderToRenameFilesIn "E:\Pictures\Camera"
+$i = 0
+Foreach ($item in $JpegData)
+{
+    $i++
+    Write-Progress -Activity "Writing files..." `
+        -Status "Processed: $i of $($JpegData.Count)" `
+        -PercentComplete (($i / $JpegData.Count) * 100)
 
-$JpegData | % {
-    If ($_.Preferred -eq 'DateTaken') {
-        Write-Log "$($_.Path)\$($_.FileName) -Destination $($_.Path)\$($_.Year)\$($month[[int]$($_.month)])\$($_.DateTaken)"
-        #Move-Item -Path ($_.Path + "\" + $_.FileName) -Destination ($_.Path + "\" + $_.Year + "\" + $month[($_.month)] + "\" + $_.DateTaken) }
-    }
+    Write-Log "$($item.Path)\$($item.FileName) -Destination $($item.Path)\$($item.Year)\$($month[[int]$($item.month)])\$($item.$($item.Preferred)).jpg"
+    #Move-Item -Path ($item.Path + "\" + $item.FileName) -Destination ($item.Path + "\" + $item.Year + "\" + $month[($item.month)] + "\" + $item.DateTaken) }
 }
 
-Write-Host "Done"
 ##$dateTakenForFilename = GetDateTakenForFilename("D:\videos\test\153-P1040727.jpg")
 ##echo $dateTakenForFilename
