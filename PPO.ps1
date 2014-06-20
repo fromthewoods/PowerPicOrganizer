@@ -18,30 +18,30 @@ Function Get-JpegData
 {
     Param
     (
-        [Parameter(Mandatory=$true)]
-        $SourceDir
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [PSObject[]]$InputObject
     )
+
     $i=0
-    $Filter = @("*.jpg","*.jpeg")
-    $jpegs = gci -Path $SourceDir -Include $Filter
-    $hash = @()
-    Foreach ($jpeg in $jpegs) {
+    $arr = @()
+
+    Foreach ($Item in $Input) {
         $i++
         Write-Progress -Activity "Reading files..." `
-            -Status "Processed: $i of $($jpegs.Count)" `
-            -PercentComplete (($i / $jpegs.Count) * 100)
+            -Status "Processed: $i of $($Input.Count)" `
+            -PercentComplete (($i / $Input.Count) * 100)
 
         #$m = $jpeg.BaseName -match "\d{8}_\d{6}"
-        If     ($jpeg.BaseName -match "\d{8}_\d{6}")                         { $FileNameStamp = $Matches[0] }
-        ElseIf ($jpeg.BaseName -match "\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}") { $FileNameStamp = $Matches[0] -replace "-","" }
+        If     ($Item.BaseName -match "\d{8}_\d{6}")                         { $FileNameStamp = $Matches[0] }
+        ElseIf ($Item.BaseName -match "\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}") { $FileNameStamp = $Matches[0] -replace "-","" }
         Else { $FileNameStamp = $false }
 
         $prop = [ordered]@{
-            FileName      = $jpeg.Name
-            DateTaken      = (Get-Exif $jpeg.FullName).DateTakenFS
+            FileName      = $Item.Name
+            DateTaken      = (Get-Exif $Item.FullName).DateTakenFS
             FileNameStamp  = $FileNameStamp
-            LastWriteTime = $jpeg.LastWriteTime.ToString('yyyyMMdd_HHmmss')
-            Path           = $jpeg.Directory
+            LastWriteTime = $Item.LastWriteTime.ToString('yyyyMMdd_HHmmss')
+            Path           = $Item.Directory
         }
         $obj = New-Object -TypeName psobject -Property $prop
 
@@ -60,9 +60,9 @@ Function Get-JpegData
 
         $obj | Add-Member -Type NoteProperty -Name Year -Value (($obj.($obj.Preferred) -split "_")[0]).substring(0,4)
         $obj | Add-Member -Type NoteProperty -Name Month -Value (($obj.($obj.Preferred) -split "_")[0]).substring(4,2)
-        $hash += $obj
+        $arr += $obj
     }
-    $hash
+    $arr
 }
 
 ########
@@ -84,19 +84,21 @@ $Global:log=@{
     Extension = ".log"
 }
 
-$JpegData = Get-JpegData -SourceDir "E:\Pictures\Camera\*"
+# The * is required for -Include
+$SourceDir = "E:\Pictures\Camera\testing2\*"
+$Filter = @("*.jpg","*.jpeg")
+
+$JpegData = gci -Path $SourceDir -Include $Filter | Get-JpegData
 
 $i = 0
-Foreach ($item in $JpegData)
-{
+$JpegData | % {
     $i++
     Write-Progress -Activity "Writing files..." `
         -Status "Processed: $i of $($JpegData.Count)" `
         -PercentComplete (($i / $JpegData.Count) * 100)
 
-    Write-Log "$($item.Path)\$($item.FileName) -Destination $($item.Path)\$($item.Year)\$($month[[int]$($item.month)])\$($item.$($item.Preferred)).jpg"
-    #Move-Item -Path ($item.Path + "\" + $item.FileName) -Destination ($item.Path + "\" + $item.Year + "\" + $month[($item.month)] + "\" + $item.DateTaken) }
+    $SourcePath = "$($_.Path)\$($_.FileName)"
+    $Destination = "$($_.Path)\$($_.Year)\$($month[[int]$($_.month)])\$($_.$($_.Preferred)).jpg"
+    Write-Log "$SourcePath -Destination $Destination"
+    Move-Item -Path $SourcePath -Destination $Destination -WhatIf
 }
-
-##$dateTakenForFilename = GetDateTakenForFilename("D:\videos\test\153-P1040727.jpg")
-##echo $dateTakenForFilename
