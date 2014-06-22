@@ -10,7 +10,9 @@
 #>
 Param
 (
-    $Global:isDebug = $false
+    $Global:isDebug = $true
+,
+    $PSDefaultParameterValues=@{"Write-Log:DebugMode"=$true}
 ,
     # Include local config and functions using call operator
     $dependencies = @(
@@ -21,7 +23,7 @@ Param
     [string]$LogsDir = "D:\Scripts\Logs\"
 ,
     # The source directory of the files. The * is required for -Include
-    $SourceDir = "E:\Pictures\Camera\testing2\*"
+    $SourceDir = "E:\Pictures\Camera\*"
 ,
     # Files types to -Include.
     $Filter = @("*.jpg","*.jpeg")
@@ -157,7 +159,7 @@ $JpegData | % {
             If (Test-Path $Destination)
             {
                 # The file still exists after 5 iterations, skip to next file.
-                If ($j -eq 5) { Write-Log "$SourcePath,$DestinationDir,ExistsAlready"; Break }
+                If ($j -eq 5) { Write-Log "$SourcePath,$Destination,ExistsAlready"; Break }
             }
             Else
             {
