@@ -19,11 +19,18 @@ Param
     # The target location for writing files to.
     [Parameter(Mandatory=$false)][string]$DestinationRoot
 ,
+    # Blocks the script from automatically generating year/month sub-directories.
+    # Can only be used when $DesinationRoot is present.
+    [switch]$ForceDestination
+,
     # Toggles Copy instead of Move for writing files.
     [switch]$PreserveOriginal
 ,
     # Toggle recurse
     [switch]$RecurseDir
+,
+    # Verify changes before performing them
+    [switch]$WhatIf
 ,
     # Files types to -Include.
     $Filter = @("*.jpg","*.jpeg")
@@ -65,10 +72,11 @@ Function Get-JpegData
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         [PSObject[]]$InputObject
     ,
-        [int]$i=0
-    ,
-        $arr = @()        
+        [int]$i=0        
     )
+
+    If ($arr) { Remove-Variable arr }
+    $arr = @()
 
     Foreach ($Item in $Input) {
         $i++
@@ -87,6 +95,7 @@ Function Get-JpegData
             FileNameStamp = $FileNameStamp
             LastWriteTime = $Item.LastWriteTime.ToString('yyyyMMdd_HHmmss')
             Path          = $Item.Directory
+            Extension     = $Item.Extension
         }
         $obj = New-Object -TypeName psobject -Property $prop
 
@@ -149,9 +158,11 @@ $dependencies | % {
 If ($DestinationRoot) { $Base = $DestinationRoot }
 Else                  { $Base = $SourceDir }
 
-# Add '*' for gci -Include.
+# Add '\*' for gci -Include.
 If ($SourceDir -notmatch "^[a-z]\:\\.*\\\*$") { $SourceDir = "$SourceDir\*" }
 
+# Retrieve data
+If ($JpegData) { Remove-Variable JpegData }
 If ($RecurseDir) { $JpegData = gci -Path $SourceDir -Include $Filter -Recurse | Get-JpegData }
 Else             { $JpegData = gci -Path $SourceDir -Include $Filter          | Get-JpegData }
 
@@ -163,11 +174,13 @@ $JpegData | % {
         -PercentComplete (($i / $JpegData.Count) * 100)
 
     $SourcePath      = "$($_.Path)\$($_.FileName)"
-    $DestinationDir  = "$Base\$($_.Year)\$($month[[int]$($_.month)])"
+    If ($ForceDestination) { $DestinationDir = $DestinationRoot }
+    Else                   { $DestinationDir  = "$Base\$($_.Year)\$($month[[int]$($_.month)])" }
     $DestinationFile = "$($_.$($_.Preferred))"
-    $Destination     = "$DestinationDir\$DestinationFile.jpg"
+    $Destination     = "$DestinationDir\$DestinationFile$($_.Extension)"
 
-    If (!(Test-Path $DestinationDir)) { mkdir $DestinationDir | Out-Null }
+    # Create dest dir if it doesn't exist and not Whatif
+    If (!(Test-Path $DestinationDir) -and (!$WhatIf)) { mkdir $DestinationDir | Out-Null }
     If (Test-Path $Destination)
     {
         # Attempt to suffix up to 5
@@ -181,18 +194,32 @@ $JpegData | % {
             }
             Else
             {
-                # Write file and skip to next file.
-                If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
-                Else                   { Move-Item -Path $SourcePath -Destination $Destination }
-                Write-Log "$SourcePath,$Destination"
-                Break
+                If ($WhatIf)
+                {
+                    Write-Log "$SourcePath,$Destination,$($_.Preferred)" -WhatIf
+                    Break
+                }
+                Else
+                {
+                    # Write file and skip to next file.
+                    If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
+                    Else                   { Move-Item -Path $SourcePath -Destination $Destination }
+                    Write-Log "$SourcePath,$Destination,$($_.Preferred)"
+                }
             }
         }
     }
     Else
     {
-        If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
-        Else                   { Move-Item -Path $SourcePath -Destination $Destination }
-        Write-Log "$SourcePath,$Destination"
+        If ($WhatIf)
+        {
+            Write-Log "$SourcePath,$Destination,$($_.Preferred)" -WhatIf
+        }
+        Else
+        {
+            If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
+            Else                   { Move-Item -Path $SourcePath -Destination $Destination }
+            Write-Log "$SourcePath,$Destination,$($_.Preferred)"
+        }
     }
 }
