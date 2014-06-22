@@ -15,7 +15,7 @@ Param
     # Include local config and functions using call operator
     $dependencies = @(
         "Get-Exif.ps1",
-        "Write-Log.ps1"
+        "..\Write-log\Write-Log.ps1"
     )
 ,
     [string]$LogsDir = "D:\Scripts\Logs\"
@@ -120,11 +120,11 @@ $dependencies | % {
     If (Test-Path ".\$_")
     {
         . ".\$_"
-        Write-Output "$(Get-Date) Loaded dependency: $_" | Tee-Object -FilePath $logFile -Append
+        Write-Output "$(Get-Date) Loaded dependency: $_" #| Tee-Object -FilePath $logFile -Append
     }
     Else 
     {
-        Write-Output "$(Get-Date) ERROR: Failed to load dependency: $_" | Tee-Object -FilePath $logFile -Append
+        Write-Output "$(Get-Date) ERROR: Failed to load dependency: $_" #| Tee-Object -FilePath $logFile -Append
         Exit 1
     }
 }
@@ -152,14 +152,17 @@ $JpegData | % {
     {
         # Attempt to suffix up to 5
         For ($j = 1; $j -le 5; $j++) {
+            # Iterate filename and check if exists.
             $Destination = "$DestinationDir\$DestinationFile ($j).jpg"
             If (Test-Path $Destination)
             {
+                # The file still exists after 5 iterations, skip to next file.
                 If ($j -eq 5) { Write-Log "$SourcePath,$DestinationDir,ExistsAlready"; Break }
             }
             Else
             {
-                Copy-Item -Path $SourcePath -Destination $Destination
+                # Write file and skip to next file.
+                Move-Item -Path $SourcePath -Destination $Destination
                 Write-Log "$SourcePath,$Destination"
                 Break
             }
@@ -167,7 +170,7 @@ $JpegData | % {
     }
     Else
     {
-        Copy-Item -Path $SourcePath -Destination $Destination
+        Move-Item -Path $SourcePath -Destination $Destination
         Write-Log "$SourcePath,$Destination"
     }
 }
