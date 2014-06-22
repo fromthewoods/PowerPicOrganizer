@@ -1,17 +1,41 @@
-﻿$month = @{
-    01 = "01 Jan"
-    02 = "02 Feb"
-    03 = "03 Mar"
-    04 = "04 Apr"
-    05 = "05 May"
-    06 = "06 Jun"
-    07 = "07 Jul"
-    08 = "08 Aug"
-    09 = "09 Sep"
-    10 = "10 Oct"
-    11 = "11 Nov"
-    12 = "12 Dec"
-}
+﻿<#
+.Synopsis
+   Short description
+.DESCRIPTION
+   Long description
+.EXAMPLE
+   Example of how to use this cmdlet
+.EXAMPLE
+   Another example of how to use this cmdlet
+#>
+Param
+(
+    $Global:isDebug = $false
+,
+    # Include local config and functions using call operator
+    $dependencies = @(
+        "Get-Exif.ps1",
+        "Write-Log.ps1"
+    )
+,
+    [string]$LogsDir = "D:\Scripts\Logs\"
+,
+    $month = @{
+        01 = "01 Jan"
+        02 = "02 Feb"
+        03 = "03 Mar"
+        04 = "04 Apr"
+        05 = "05 May"
+        06 = "06 Jun"
+        07 = "07 Jul"
+        08 = "08 Aug"
+        09 = "09 Sep"
+        10 = "10 Oct"
+        11 = "11 Nov"
+        12 = "12 Dec"
+    }
+
+)
 
 
 Function Get-JpegData
@@ -74,12 +98,9 @@ $parentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $includesDir = "$parentDir\"
 cd $includesDir
 
-# Include local config and functions using call operator
-. .\Get-Exif.ps1
 
-$Global:isDebug = $false
 $Global:log=@{
-    Location = "D:\Scripts\Logs\"
+    Location = $LogsDir
     Name = "$($MyInvocation.MyCommand.Name)_$(Get-Date -UFormat %Y-%m-%d.%H-%M-%S)"
     Extension = ".log"
 }
@@ -97,14 +118,32 @@ $JpegData | % {
         -Status "Processed: $i of $($JpegData.Count)" `
         -PercentComplete (($i / $JpegData.Count) * 100)
 
-    $SourcePath     = "$($_.Path)\$($_.FileName)"
-    $DestinationDir = "$($_.Path)\$($_.Year)\$($month[[int]$($_.month)])\"
-    $Destination    = "$($_.Path)\$($_.Year)\$($month[[int]$($_.month)])\$($_.$($_.Preferred)).jpg"
-
-    Write-Log "$SourcePath -Destination $Destination"
+    $SourcePath      = "$($_.Path)\$($_.FileName)"
+    $DestinationDir  = "$($_.Path)\$($_.Year)\$($month[[int]$($_.month)])"
+    $DestinationFile = "$($_.$($_.Preferred))"
+    $Destination     = "$DestinationDir\$DestinationFile.jpg"
 
     If (!(Test-Path $DestinationDir)) { mkdir $DestinationDir | Out-Null }
-    #If (  Test-Path $Destination )
-    #{}
-    Move-Item -Path $SourcePath -Destination $Destination
+    If (Test-Path $Destination)
+    {
+        # Attempt to suffix up to 5
+        For ($j = 1; $j -le 5; $j++) {
+            $Destination = "$DestinationDir\$DestinationFile ($j).jpg"
+            If (Test-Path $Destination)
+            {
+                If ($j -eq 5) { Write-Log "$SourcePath,$DestinationDir,ExistsAlready"; Break }
+            }
+            Else
+            {
+                Copy-Item -Path $SourcePath -Destination $Destination
+                Write-Log "$SourcePath,$Destination"
+                Break
+            }
+        }
+    }
+    Else
+    {
+        Copy-Item -Path $SourcePath -Destination $Destination
+        Write-Log "$SourcePath,$Destination"
+    }
 }
