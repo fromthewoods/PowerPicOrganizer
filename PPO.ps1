@@ -8,25 +8,37 @@
 .EXAMPLE
    Another example of how to use this cmdlet
 #>
+[CmdletBinding()]
 Param
 (
+    # The source directory of the files. The * is required for -Include
+    [Parameter(Mandatory=$true,Position=0)]
+    #[ValidatePattern("^[a-z]\:\\.*\\\*$")] # Check for Drive letter and ending in '*'.
+    [string]$SourceDir
+,
+    # The target location for writing files to.
+    [Parameter(Mandatory=$false)][string]$DestinationRoot
+,
+    # Toggles Copy instead of Move for writing files.
+    [switch]$PreserveOriginal
+,
+    # Toggle recurse
+    [switch]$RecurseDir
+,
+    # Files types to -Include.
+    $Filter = @("*.jpg","*.jpeg")
+,
     $Global:isDebug = $true
 ,
     $PSDefaultParameterValues=@{"Write-Log:DebugMode"=$true}
 ,
-    # Include local config and functions using call operator
+    # Include local config and functions.
     $dependencies = @(
         "Get-Exif.ps1",
         "..\Write-log\Write-Log.ps1"
     )
 ,
     [string]$LogsDir = "D:\Scripts\Logs\"
-,
-    # The source directory of the files. The * is required for -Include
-    $SourceDir = "E:\Pictures\Camera\*"
-,
-    # Files types to -Include.
-    $Filter = @("*.jpg","*.jpeg")
 ,
     $month = @{
         01 = "01 Jan"
@@ -42,12 +54,12 @@ Param
         11 = "11 Nov"
         12 = "12 Dec"
     }
-
 )
 
 
 Function Get-JpegData
 {
+    [CmdletBinding()]
     Param
     (
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
@@ -57,8 +69,6 @@ Function Get-JpegData
     ,
         $arr = @()        
     )
-
-
 
     Foreach ($Item in $Input) {
         $i++
@@ -135,7 +145,15 @@ $dependencies | % {
 # MAIN #
 ########
 
-$JpegData = gci -Path $SourceDir -Include $Filter | Get-JpegData
+# Setup target destination for writing files later
+If ($DestinationRoot) { $Base = $DestinationRoot }
+Else                  { $Base = $SourceDir }
+
+# Add '*' for gci -Include.
+If ($SourceDir -notmatch "^[a-z]\:\\.*\\\*$") { $SourceDir = "$SourceDir\*" }
+
+If ($RecurseDir) { $JpegData = gci -Path $SourceDir -Include $Filter -Recurse | Get-JpegData }
+Else             { $JpegData = gci -Path $SourceDir -Include $Filter          | Get-JpegData }
 
 $i = 0
 $JpegData | % {
@@ -145,7 +163,7 @@ $JpegData | % {
         -PercentComplete (($i / $JpegData.Count) * 100)
 
     $SourcePath      = "$($_.Path)\$($_.FileName)"
-    $DestinationDir  = "$($_.Path)\$($_.Year)\$($month[[int]$($_.month)])"
+    $DestinationDir  = "$Base\$($_.Year)\$($month[[int]$($_.month)])"
     $DestinationFile = "$($_.$($_.Preferred))"
     $Destination     = "$DestinationDir\$DestinationFile.jpg"
 
@@ -164,7 +182,8 @@ $JpegData | % {
             Else
             {
                 # Write file and skip to next file.
-                Move-Item -Path $SourcePath -Destination $Destination
+                If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
+                Else                   { Move-Item -Path $SourcePath -Destination $Destination }
                 Write-Log "$SourcePath,$Destination"
                 Break
             }
@@ -172,7 +191,8 @@ $JpegData | % {
     }
     Else
     {
-        Move-Item -Path $SourcePath -Destination $Destination
+        If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
+        Else                   { Move-Item -Path $SourcePath -Destination $Destination }
         Write-Log "$SourcePath,$Destination"
     }
 }
