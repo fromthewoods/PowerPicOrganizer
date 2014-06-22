@@ -20,6 +20,12 @@ Param
 ,
     [string]$LogsDir = "D:\Scripts\Logs\"
 ,
+    # The source directory of the files. The * is required for -Include
+    $SourceDir = "E:\Pictures\Camera\testing2\*"
+,
+    # Files types to -Include.
+    $Filter = @("*.jpg","*.jpeg")
+,
     $month = @{
         01 = "01 Jan"
         02 = "02 Feb"
@@ -44,10 +50,13 @@ Function Get-JpegData
     (
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         [PSObject[]]$InputObject
+    ,
+        [int]$i=0
+    ,
+        $arr = @()        
     )
 
-    $i=0
-    $arr = @()
+
 
     Foreach ($Item in $Input) {
         $i++
@@ -89,25 +98,40 @@ Function Get-JpegData
     $arr
 }
 
-########
-# MAIN #
-########
+#########
+# SETUP #
+#########
 
 #Locate the invocation directory and cd to it to be able to load local functions.
 $parentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $includesDir = "$parentDir\"
 cd $includesDir
 
-
+# Create the log name from the script name
 $Global:log=@{
     Location = $LogsDir
     Name = "$($MyInvocation.MyCommand.Name)_$(Get-Date -UFormat %Y-%m-%d.%H-%M-%S)"
     Extension = ".log"
 }
+$logFile = $log.Location + $log.Name + $log.Extension
 
-# The * is required for -Include
-$SourceDir = "E:\Pictures\Camera\testing2\*"
-$Filter = @("*.jpg","*.jpeg")
+# Source local config and functions using call operator (dot sourcing)
+$dependencies | % {
+    If (Test-Path ".\$_")
+    {
+        . ".\$_"
+        Write-Output "$(Get-Date) Loaded dependency: $_" | Tee-Object -FilePath $logFile -Append
+    }
+    Else 
+    {
+        Write-Output "$(Get-Date) ERROR: Failed to load dependency: $_" | Tee-Object -FilePath $logFile -Append
+        Exit 1
+    }
+}
+
+########
+# MAIN #
+########
 
 $JpegData = gci -Path $SourceDir -Include $Filter | Get-JpegData
 
