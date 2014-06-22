@@ -33,7 +33,7 @@ Param
     [switch]$WhatIf
 ,
     # Files types to -Include.
-    $Filter = @("*.jpg","*.jpeg")
+    $Filter = @("*.jpg","*.jpeg","*.mov","*.avi")
 ,
     $Global:isDebug = $true
 ,
@@ -89,9 +89,19 @@ Function Get-JpegData
         ElseIf ($Item.BaseName -match "\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}") { $FileNameStamp = $Matches[0] -replace "-","" }
         Else { $FileNameStamp = $false }
 
+        # Get Exif data if jpg file.
+        If ($Item.Extension -like "*.jpg" -or $Item.Extension -like "*.jpeg")
+        {
+            $DateTaken = (Get-Exif $Item.FullName).DateTakenFS
+        }
+        Else
+        {
+            $DateTaken = ""
+        }
+
         $prop = [ordered]@{
             FileName      = $Item.Name
-            DateTaken     = (Get-Exif $Item.FullName).DateTakenFS
+            DateTaken     = $DateTaken
             FileNameStamp = $FileNameStamp
             LastWriteTime = $Item.LastWriteTime.ToString('yyyyMMdd_HHmmss')
             Path          = $Item.Directory
@@ -186,11 +196,15 @@ $JpegData | % {
         # Attempt to suffix up to 5
         For ($j = 1; $j -le 5; $j++) {
             # Iterate filename and check if exists.
-            $Destination = "$DestinationDir\$DestinationFile ($j).jpg"
+            $Destination = "$DestinationDir\$DestinationFile ($j)$($_.Extension)"
             If (Test-Path $Destination)
             {
                 # The file still exists after 5 iterations, skip to next file.
-                If ($j -eq 5) { Write-Log "$SourcePath,$Destination,ExistsAlready"; Break }
+                If ($j -eq 5)
+                {
+                    If ($WhatIf) { Write-Log "$SourcePath,$Destination,ExistsAlready" -WhatIf ; Break }
+                    Else         { Write-Log "$SourcePath,$Destination,ExistsAlready"         ; Break }
+                }
             }
             Else
             {
@@ -205,6 +219,7 @@ $JpegData | % {
                     If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
                     Else                   { Move-Item -Path $SourcePath -Destination $Destination }
                     Write-Log "$SourcePath,$Destination,$($_.Preferred)"
+                    Break
                 }
             }
         }
