@@ -33,7 +33,7 @@ Param
     [switch]$WhatIf
 ,
     # Files types to -Include.
-    $Filter = @("*.jpg","*.jpeg","*.mov","*.avi")
+    $Filter = @("*.jpg","*.jpeg","*.mov","*.mp4")
 ,
     $Global:isDebug = $true
 ,
