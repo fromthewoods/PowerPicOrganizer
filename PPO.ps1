@@ -218,7 +218,8 @@ $dependencies | % {
 ########
 # MAIN #
 ########
-$WhatIf=$true
+
+#$WhatIf=$true
 
 # Setup target destination for writing files later
 If ($DestinationRoot) { $Base = $DestinationRoot }
