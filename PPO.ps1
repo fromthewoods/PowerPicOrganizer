@@ -63,7 +63,16 @@ Param
     }
 )
 
-
+<#
+.Synopsis
+   Short description
+.DESCRIPTION
+   Long description
+.EXAMPLE
+   Example of how to use this cmdlet
+.EXAMPLE
+   Another example of how to use this cmdlet
+#>
 Function Get-JpegData
 {
     [CmdletBinding()]
@@ -92,7 +101,7 @@ Function Get-JpegData
         # Get Exif data if jpg file.
         If ($Item.Extension -like "*.jpg" -or $Item.Extension -like "*.jpeg")
         {
-            $DateTaken = (Get-Exif $Item.FullName).DateTakenFS
+            $DateTaken = Get-DateTaken $Item.FullName
         }
         Else
         {
@@ -124,9 +133,55 @@ Function Get-JpegData
 
         $obj | Add-Member -Type NoteProperty -Name Year -Value (($obj.($obj.Preferred) -split "_")[0]).substring(0,4)
         $obj | Add-Member -Type NoteProperty -Name Month -Value (($obj.($obj.Preferred) -split "_")[0]).substring(4,2)
+
         $arr += $obj
     }
     $arr
+}
+
+<#
+.Synopsis
+   Short description
+.DESCRIPTION
+   Long description
+.EXAMPLE
+   Example of how to use this cmdlet
+.EXAMPLE
+   Another example of how to use this cmdlet
+#>
+function Get-DateTaken
+{
+    [CmdletBinding()]
+    [OutputType([string])]
+    Param
+    (
+        # Param1 help description
+        [Parameter(Mandatory=$true,
+                   ValueFromPipeline=$true,
+                   Position=0)]
+        $file
+    )
+
+    $ImageMetaData = $file | .\Get-ImageMetaData.ps1
+    If ($ImageMetaData.36867)
+    {
+        $ExifDate = $ImageMetaData.36867
+        $ExifDate = $ExifDate.Replace(":","").Replace(" ","_")
+    }
+    If ($ImageMetaData.'/xmp/exif:DateTimeOriginal')
+    {
+        $XmpDate = $ImageMetaData.'/xmp/exif:DateTimeOriginal'
+        $XmpDate = ([datetime]$XmpDate).ToString("yyyyMMdd_HHmmss")
+    }
+    # Error out if both exist
+    If ($ExifDate -and $XmpDate)
+    {
+        Write-Log "ERROR: Both Exif date ($ExifDate) and XMP date ($XmpDate) exist for file $file."
+        Exit 1
+    }
+    # Pick whichever exists
+    If ($ExifDate) { Return $ExifDate }
+    If ($XmpDate ) { Return $XmpDate  }
 }
 
 #########
@@ -163,6 +218,7 @@ $dependencies | % {
 ########
 # MAIN #
 ########
+$WhatIf=$true
 
 # Setup target destination for writing files later
 If ($DestinationRoot) { $Base = $DestinationRoot }
