@@ -19,6 +19,8 @@ Param
     # The target location for writing files to.
     [Parameter(Mandatory=$false)][string]$DestinationRoot
 ,
+    [string]$LogsDir
+,
     # Blocks the script from automatically generating year/month sub-directories.
     # Can only be used when $DesinationRoot is present.
     [switch]$ForceDestination
@@ -33,19 +35,14 @@ Param
     [switch]$WhatIf
 ,
     # Files types to -Include.
-    $Filter = @("*.jpg","*.jpeg","*.mov","*.mp4")
+    $Filter = @("*.jpg","*.jpeg","*.mov","*.mp4","*.avi")
 ,
     $Global:isDebug = $true
 ,
     $PSDefaultParameterValues=@{"Write-Log:DebugMode"=$true}
 ,
     # Include local config and functions.
-    $dependencies = @(
-        "Get-Exif.ps1",
-        "..\Write-log\Write-Log.ps1"
-    )
-,
-    [string]$LogsDir = "D:\Scripts\Logs\"
+    $dependencies = @("..\Write-log\Write-Log.ps1")
 ,
     $month = @{
         01 = "01 Jan"
@@ -166,18 +163,34 @@ function Get-DateTaken
     If ($ImageMetaData.36867)
     {
         $ExifDate = $ImageMetaData.36867
-        $ExifDate = $ExifDate.Replace(":","").Replace(" ","_")
+        If ($ExifDate -match "\d\d\d\d:\d\d:\d\d \d\d:\d\d:\d\d")
+        {
+            $ExifDate = $ExifDate.Replace(":","").Replace(" ","_")
+        }
+        Else # Sometimes EXIF data taken is a datetime string
+        {
+            $ExifDate = ([datetime]$ExifDate).ToString("yyyyMMdd_HHmmss")
+        }
+        # Confirm output is expected
+        If ($ExifDate -notmatch "\d{8}_\d{6}") { Write-Log "ERROR: The file $file has unsupported exif data."; Exit 1 }
     }
     If ($ImageMetaData.'/xmp/exif:DateTimeOriginal')
     {
         $XmpDate = $ImageMetaData.'/xmp/exif:DateTimeOriginal'
         $XmpDate = ([datetime]$XmpDate).ToString("yyyyMMdd_HHmmss")
+        # Confirm output is expected
+        If ($XmpDate -notmatch "\d{8}_\d{6}") { Write-Log "ERROR: The file $file has unsupported xmp data."; Exit 1 }
     }
     # Error out if both exist
     If ($ExifDate -and $XmpDate)
     {
-        Write-Log "ERROR: Both Exif date ($ExifDate) and XMP date ($XmpDate) exist for file $file."
-        Exit 1
+        # If metadata dates match then return one
+        If ([string]$ExifDate -like [string]$XmpDate) { Return $ExifDate }
+        Else
+        {
+            Write-Log "ERROR: Both Exif date ($ExifDate) and XMP date ($XmpDate) exist for file $file."
+            Exit 1
+        }
     }
     # Pick whichever exists
     If ($ExifDate) { Return $ExifDate }
@@ -194,6 +207,7 @@ $includesDir = "$parentDir\"
 cd $includesDir
 
 # Create the log name from the script name
+If (!$LogsDir) { $LogsDir = $includesDir }
 $Global:log=@{
     Location = $LogsDir
     Name = "$($MyInvocation.MyCommand.Name)_$(Get-Date -UFormat %Y-%m-%d.%H-%M-%S)"
