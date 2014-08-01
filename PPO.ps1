@@ -316,7 +316,12 @@ $JpegData | % {
 
     # Create dest dir if it doesn't exist and not Whatif
     If (!(Test-Path $DestinationDir) -and (!$WhatIf)) { mkdir $DestinationDir | Out-Null }
-    If (Test-Path $Destination)
+
+    If ($SourcePath -eq $Destination)
+    {
+        Write-Log "Skipping file because it is already properly named: $SourcePath"
+    }
+    ElseIf (Test-Path $Destination)
     {
         # Attempt to suffix up to 5
         For ($j = 1; $j -le 5; $j++) {
