@@ -17,7 +17,7 @@ Param
     [string]$SourceDir
 ,
     # The target location for writing files to.
-    [Parameter(Mandatory=$false)][string]$DestinationRoot
+    [Parameter(Mandatory=$false,Position=1)][string]$DestinationRoot
 ,
     [string]$LogsDir
 ,
@@ -118,10 +118,10 @@ Function Get-JpegData
         # Prefer DateTaken if it exists
         If ($obj.DateTaken)                                                                { $obj | Add-Member -Type NoteProperty -Name Preferred -Value DateTaken }
         
-        # Prefer FileNameStamp if it's less than LastWriteTime[0]
+        # Prefer FileNameStamp if it's less than LastWriteTime[0] (yyyyMMdd)
         ElseIf (($obj.FileNameStamp -split "_")[0] -lt ($obj.LastWriteTime -split "_")[0]) { $obj | Add-Member -Type NoteProperty -Name Preferred -Value FileNameStamp }
 
-        # Prefer FileNameStamp if it's less than LastWriteTime[0,1]
+        # Prefer FileNameStamp if it's less than LastWriteTime[0,1] (yyyyMMdd,HHmmmss)
         ElseIf (($obj.FileNameStamp -split "_")[0] -eq ($obj.LastWriteTime -split "_")[0] `
           -and (($obj.FileNameStamp -split "_")[1] -lt ($obj.LastWriteTime -split "_")[1])){ $obj | Add-Member -Type NoteProperty -Name Preferred -Value FileNameStamp }
         
