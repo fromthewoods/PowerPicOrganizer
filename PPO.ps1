@@ -1,10 +1,10 @@
 ﻿<#
 .Synopsis
-   Short description
+   Scan picture and video files and attempts to organize them by date.
 .DESCRIPTION
    Long description
 .EXAMPLE
-   Example of how to use this cmdlet
+   .\PPO.ps1 'M:\Pictures\2009\0*' M:\Pictures -WhatIf -RecurseDir
 .EXAMPLE
    Another example of how to use this cmdlet
 #>
@@ -34,7 +34,7 @@ Param
     # Verify changes before performing them
     [switch]$WhatIf
 ,
-    # Files types to -Include.
+    # File types to -Include.
     $Filter = @("*.jpg","*.jpeg","*.mov","*.mpg","*.mp4","*.avi")
 ,
     $Global:isDebug = $true
