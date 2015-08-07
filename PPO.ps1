@@ -60,6 +60,7 @@ Param
     }
 )
 
+function Get-JpegData {
 <#
 .Synopsis
    Short description
@@ -70,8 +71,6 @@ Param
 .EXAMPLE
    Another example of how to use this cmdlet
 #>
-Function Get-JpegData
-{
     [CmdletBinding()]
     Param
     (
@@ -136,6 +135,7 @@ Function Get-JpegData
     $arr
 }
 
+function Get-DateTaken {
 <#
 .Synopsis
    Short description
@@ -146,8 +146,6 @@ Function Get-JpegData
 .EXAMPLE
    Another example of how to use this cmdlet
 #>
-function Get-DateTaken
-{
     [CmdletBinding()]
     [OutputType([string])]
     Param
@@ -251,9 +249,7 @@ function Get-DateTaken
     If ($XmpDate ) { Return $XmpDate  }
 }
 
-#########
-# SETUP #
-#########
+#region ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #Locate the invocation directory and cd to it to be able to load local functions.
 $parentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -282,10 +278,9 @@ $dependencies | % {
         Exit 1
     }
 }
+#endregion
 
-########
-# MAIN #
-########
+#region ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ MAIN ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #$WhatIf=$true
 
@@ -368,3 +363,4 @@ $JpegData | % {
         }
     }
 }
+#endregion
