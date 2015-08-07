@@ -80,59 +80,67 @@ function Get-JpegData {
         [int]$i=0        
     )
 
-    If ($arr) { Remove-Variable arr }
-    $arr = @()
+    Try
+    {
+        If ($arr) { Remove-Variable arr }
+        $arr = @()
 
-    Foreach ($Item in $Input) {
-        $i++
-        Write-Progress -Activity "Reading files..." `
-            -Status "Processed: $i of $($Input.Count)" `
-            -PercentComplete (($i / $Input.Count) * 100)
+        Foreach ($Item in $Input) {
+            $i++
+            Write-Progress -Activity "Reading files..." `
+                           -Status "Processed: $i of $($Input.Count)" `
+                           -PercentComplete (($i / $Input.Count) * 100)
 
-        #$m = $jpeg.BaseName -match "\d{8}_\d{6}"
-        If     ($Item.BaseName -match "\d{8}_\d{6}")                         { $FileNameStamp = $Matches[0] }
-        ElseIf ($Item.BaseName -match "\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}") { $FileNameStamp = $Matches[0] -replace "-","" }
-        Else { $FileNameStamp = $false }
+            #$m = $jpeg.BaseName -match "\d{8}_\d{6}"
+            If     ($Item.BaseName -match "\d{8}_\d{6}")                         { $FileNameStamp = $Matches[0] }
+            ElseIf ($Item.BaseName -match "\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}") { $FileNameStamp = $Matches[0] -replace "-","" }
+            Else { $FileNameStamp = $false }
 
-        # Get Exif data if jpg file.
-        If ($Item.Extension -like "*.jpg" -or $Item.Extension -like "*.jpeg")
-        {
-            $DateTaken = Get-DateTaken $Item.FullName
+            # Get Exif data if jpg file.
+            If ($Item.Extension -like "*.jpg" -or $Item.Extension -like "*.jpeg")
+            {
+                $DateTaken = Get-DateTaken $Item.FullName
+            }
+            Else
+            {
+                $DateTaken = ""
+            }
+
+            $prop = [ordered]@{
+                FileName      = $Item.Name
+                DateTaken     = $DateTaken
+                FileNameStamp = $FileNameStamp
+                LastWriteTime = $Item.LastWriteTime.ToString('yyyyMMdd_HHmmss')
+                Path          = $Item.Directory
+                Extension     = $Item.Extension
+            }
+            $obj = New-Object -TypeName psobject -Property $prop
+
+            # Prefer DateTaken if it exists
+            If ($obj.DateTaken)                                                                { $obj | Add-Member -Type NoteProperty -Name Preferred -Value DateTaken }
+            
+            # Prefer FileNameStamp if it's less than LastWriteTime[0] (yyyyMMdd)
+            ElseIf (($obj.FileNameStamp -split "_")[0] -lt ($obj.LastWriteTime -split "_")[0]) { $obj | Add-Member -Type NoteProperty -Name Preferred -Value FileNameStamp }
+
+            # Prefer FileNameStamp if it's less than LastWriteTime[0,1] (yyyyMMdd,HHmmmss)
+            ElseIf (($obj.FileNameStamp -split "_")[0] -eq ($obj.LastWriteTime -split "_")[0] `
+              -and (($obj.FileNameStamp -split "_")[1] -lt ($obj.LastWriteTime -split "_")[1])){ $obj | Add-Member -Type NoteProperty -Name Preferred -Value FileNameStamp }
+            
+            # Last resort is prefer LastWriteTime
+            Else { $obj | Add-Member -Type NoteProperty -Name Preferred -Value LastWriteTime }
+
+            $obj | Add-Member -Type NoteProperty -Name Year -Value (($obj.($obj.Preferred) -split "_")[0]).substring(0,4)
+            $obj | Add-Member -Type NoteProperty -Name Month -Value (($obj.($obj.Preferred) -split "_")[0]).substring(4,2)
+
+            $arr += $obj
         }
-        Else
-        {
-            $DateTaken = ""
+        $arr
         }
-
-        $prop = [ordered]@{
-            FileName      = $Item.Name
-            DateTaken     = $DateTaken
-            FileNameStamp = $FileNameStamp
-            LastWriteTime = $Item.LastWriteTime.ToString('yyyyMMdd_HHmmss')
-            Path          = $Item.Directory
-            Extension     = $Item.Extension
-        }
-        $obj = New-Object -TypeName psobject -Property $prop
-
-        # Prefer DateTaken if it exists
-        If ($obj.DateTaken)                                                                { $obj | Add-Member -Type NoteProperty -Name Preferred -Value DateTaken }
-        
-        # Prefer FileNameStamp if it's less than LastWriteTime[0] (yyyyMMdd)
-        ElseIf (($obj.FileNameStamp -split "_")[0] -lt ($obj.LastWriteTime -split "_")[0]) { $obj | Add-Member -Type NoteProperty -Name Preferred -Value FileNameStamp }
-
-        # Prefer FileNameStamp if it's less than LastWriteTime[0,1] (yyyyMMdd,HHmmmss)
-        ElseIf (($obj.FileNameStamp -split "_")[0] -eq ($obj.LastWriteTime -split "_")[0] `
-          -and (($obj.FileNameStamp -split "_")[1] -lt ($obj.LastWriteTime -split "_")[1])){ $obj | Add-Member -Type NoteProperty -Name Preferred -Value FileNameStamp }
-        
-        # Last resort is prefer LastWriteTime
-        Else { $obj | Add-Member -Type NoteProperty -Name Preferred -Value LastWriteTime }
-
-        $obj | Add-Member -Type NoteProperty -Name Year -Value (($obj.($obj.Preferred) -split "_")[0]).substring(0,4)
-        $obj | Add-Member -Type NoteProperty -Name Month -Value (($obj.($obj.Preferred) -split "_")[0]).substring(4,2)
-
-        $arr += $obj
+    Catch
+    {
+        Write-Log "ERROR: $($_.Exception.Message)"
+        Write-Log "ERROR: $($_.InvocationInfo.PositionMessage.Split('+')[0])"
     }
-    $arr
 }
 
 function Get-DateTaken {
@@ -157,96 +165,111 @@ function Get-DateTaken {
         $file
     )
 
-    $ImageMetaData = $file | .\Get-ImageMetaData.ps1
+    Try
+    {
+        $ImageMetaData = $file | .\Get-ImageMetaData.ps1
 
-    # ExifDTOrig (0x9003): Date and time when the original image data was generated. For a DSC, the date and time when the picture was taken. The format is YYYY:MM:DD HH:MM:SS with time shown in 24-hour format and the date and time separated by one blank character (0x2000). The character string length is 20 bytes including the NULL terminator. When the field is empty, it is treated as unknown.
-    If ($ImageMetaData.36867)
-    {
-        $ExifDTOrig = $ImageMetaData.36867
-        If ($ExifDTOrig -match "\d\d\d\d:\d\d:\d\d \d\d:\d\d:\d\d")
+        # ExifDTOrig (0x9003): Date and time when the original image data was generated. For a DSC, the date 
+        # and time when the picture was taken. The format is YYYY:MM:DD HH:MM:SS with time shown in 24-hour 
+        # format and the date and time separated by one blank character (0x2000). The character string length 
+        # is 20 bytes including the NULL terminator. When the field is empty, it is treated as unknown.
+        If ($ImageMetaData.36867)
         {
-            $ExifDTOrig = $ExifDTOrig.Replace(":","").Replace(" ","_")
+            $ExifDTOrig = $ImageMetaData.36867
+            If ($ExifDTOrig -match "\d\d\d\d:\d\d:\d\d \d\d:\d\d:\d\d")
+            {
+                $ExifDTOrig = $ExifDTOrig.Replace(":","").Replace(" ","_")
+            }
+            Else # Sometimes EXIF data taken is a datetime string
+            {
+                Try { $ExifDTOrig = ([datetime]$ExifDTOrig).ToString("yyyyMMdd_HHmmss") }
+                Catch {}
+            }
+            # Confirm output is expected
+            If ($ExifDTOrig -notmatch "\d{8}_\d{6}")
+            {
+                #Write-Log "ERROR: The file $file has unsupported ExifDTOrig(36867|0x9003) data." -DebugMode
+                $ExifDTOrig = $false
+            }
         }
-        Else # Sometimes EXIF data taken is a datetime string
-        {
-            Try { $ExifDTOrig = ([datetime]$ExifDTOrig).ToString("yyyyMMdd_HHmmss") }
-            Catch {}
-        }
-        # Confirm output is expected
-        If ($ExifDTOrig -notmatch "\d{8}_\d{6}")
-        {
-            #Write-Log "ERROR: The file $file has unsupported ExifDTOrig(36867|0x9003) data." -DebugMode
-            $ExifDTOrig = $false
-        }
-    }
 
-    # ExifDTDigitized (0x9004): Date and time when the image was stored as digital data. If, for example, an image was captured by DSC and at the same time the file was recorded, then DateTimeOriginal and DateTimeDigitized will have the same contents. The format is YYYY:MM:DD HH:MM:SS with time shown in 24-hour format and the date and time separated by one blank character (0x2000). The character string length is 20 bytes including the NULL terminator. When the field is empty, it is treated as unknown.
-    If ($ImageMetaData.36868)
-    {
-        $ExifDTDigitized = $ImageMetaData.36868
-        If ($ExifDTDigitized -match "\d\d\d\d:\d\d:\d\d \d\d:\d\d:\d\d")
+        # ExifDTDigitized (0x9004): Date and time when the image was stored as digital data. If, for example, 
+        # an image was captured by DSC and at the same time the file was recorded, then DateTimeOriginal and 
+        # DateTimeDigitized will have the same contents. The format is YYYY:MM:DD HH:MM:SS with time shown in 
+        # 24-hour format and the date and time separated by one blank character (0x2000). The character string 
+        # length is 20 bytes including the NULL terminator. When the field is empty, it is treated as unknown.
+        If ($ImageMetaData.36868)
         {
-            $ExifDTDigitized = $ExifDTDigitized.Replace(":","").Replace(" ","_")
+            $ExifDTDigitized = $ImageMetaData.36868
+            If ($ExifDTDigitized -match "\d\d\d\d:\d\d:\d\d \d\d:\d\d:\d\d")
+            {
+                $ExifDTDigitized = $ExifDTDigitized.Replace(":","").Replace(" ","_")
+            }
+            Else # Sometimes EXIF data taken is a datetime string
+            {
+                $ExifDTDigitized = ([datetime]$ExifDTDigitized).ToString("yyyyMMdd_HHmmss")
+            }
+            # Confirm output is expected
+            If ($ExifDTDigitized -notmatch "\d{8}_\d{6}")
+            {
+                #Write-Log "ERROR: The file $file has unsupported ExifDTDigitized(36868|0x9004) data." -DebugMode
+                $ExifDTDigitized = $false
+            }
         }
-        Else # Sometimes EXIF data taken is a datetime string
-        {
-            $ExifDTDigitized = ([datetime]$ExifDTDigitized).ToString("yyyyMMdd_HHmmss")
-        }
-        # Confirm output is expected
-        If ($ExifDTDigitized -notmatch "\d{8}_\d{6}")
-        {
-            #Write-Log "ERROR: The file $file has unsupported ExifDTDigitized(36868|0x9004) data." -DebugMode
-            $ExifDTDigitized = $false
-        }
-    }
 
-    # Error out if both EXIF types exist
-    If ($ExifDTOrig -and $ExifDTDigitized)
-    {
-        # If metadata dates match then return one.
-        If ($ExifDTOrig -like $ExifDTDigitized) { $ExifDate = $ExifDTOrig }
-        Else
+        # Error out if both EXIF types exist
+        If ($ExifDTOrig -and $ExifDTDigitized)
         {
-            Write-Log "ERROR: Two Exif types exist for file $file. ExifDTOrig: $ExifDTOrig, ExifDTDigitized: $ExifDTDigitized"
-            Exit 1
+            # If metadata dates match then return one.
+            If ($ExifDTOrig -like $ExifDTDigitized) { $ExifDate = $ExifDTOrig }
+            Else
+            {
+                Write-Log "ERROR: Two Exif types exist for file $file. ExifDTOrig: $ExifDTOrig, ExifDTDigitized: $ExifDTDigitized"
+                Exit 1
+            }
         }
-    }
 
-    # Decide which exit metadata to use.
-    If ($ExifDTOrig)
-    {
-        #Write-Log "Using ExifDTOrig"
-        $ExifDate = $ExifDTOrig
-    }
-    If ($ExifDTDigitized)
-    {
-        #Write-Log "Using ExifDTDigitized"
-        $ExifDate = $ExifDTDigitized
-    }
-
-    # Parse XMP metadata
-    If ($ImageMetaData.'/xmp/exif:DateTimeOriginal')
-    {
-        $XmpDate = $ImageMetaData.'/xmp/exif:DateTimeOriginal'
-        $XmpDate = ([datetime]$XmpDate).ToString("yyyyMMdd_HHmmss")
-        # Confirm output is expected
-        If ($XmpDate -notmatch "\d{8}_\d{6}") { Write-Log "ERROR: The file $file has unsupported xmp data."; Exit 1 }
-    }
-
-    # Error out if both exist
-    If ($ExifDate -and $XmpDate)
-    {
-        # If metadata dates match then return one
-        If ([string]$ExifDate -like [string]$XmpDate) { Return $ExifDate }
-        Else
+        # Decide which exif metadata to use.
+        If ($ExifDTOrig)
         {
-            Write-Log "ERROR: Both Exif date ($ExifDate) and XMP date ($XmpDate) exist for file $file."
-            Exit 1
+            #Write-Log "Using ExifDTOrig"
+            $ExifDate = $ExifDTOrig
         }
+        If ($ExifDTDigitized)
+        {
+            #Write-Log "Using ExifDTDigitized"
+            $ExifDate = $ExifDTDigitized
+        }
+
+        # Parse XMP metadata
+        If ($ImageMetaData.'/xmp/exif:DateTimeOriginal')
+        {
+            $XmpDate = $ImageMetaData.'/xmp/exif:DateTimeOriginal'
+            $XmpDate = ([datetime]$XmpDate).ToString("yyyyMMdd_HHmmss")
+            # Confirm output is expected
+            If ($XmpDate -notmatch "\d{8}_\d{6}") { Write-Log "ERROR: The file $file has unsupported xmp data."; Exit 1 }
+        }
+
+        # Error out if both exist
+        If ($ExifDate -and $XmpDate)
+        {
+            # If metadata dates match then return one
+            If ([string]$ExifDate -like [string]$XmpDate) { Return $ExifDate }
+            Else
+            {
+                Write-Log "ERROR: Both Exif date ($ExifDate) and XMP date ($XmpDate) exist for file $file."
+                Exit 1
+            }
+        }
+        # Pick whichever exists
+        If ($ExifDate) { Return $ExifDate }
+        If ($XmpDate ) { Return $XmpDate  }
     }
-    # Pick whichever exists
-    If ($ExifDate) { Return $ExifDate }
-    If ($XmpDate ) { Return $XmpDate  }
+    Catch
+    {
+        Write-Log "ERROR: $($_.Exception.Message)"
+        Write-Log "ERROR: $($_.InvocationInfo.PositionMessage.Split('+')[0])"
+    }
 }
 
 #region ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -282,85 +305,93 @@ $dependencies | % {
 
 #region ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ MAIN ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#$WhatIf=$true
-
-# Setup target destination for writing files later
-If ($DestinationRoot) { $Base = $DestinationRoot }
-Else                  { $Base = $SourceDir }
-
-# Add '\*' for gci -Include.
-If ($SourceDir -notmatch "^[a-z]\:\\.*\\\*$") { $SourceDir = "$SourceDir\*" }
-
-# Retrieve data
-If ($JpegData) { Remove-Variable JpegData }
-If ($RecurseDir) { $JpegData = gci -Path $SourceDir -Include $Filter -Recurse | Get-JpegData }
-Else             { $JpegData = gci -Path $SourceDir -Include $Filter          | Get-JpegData }
-
-$i = 0
-$JpegData | % {
-    $i++
-    Write-Progress -Activity "Writing files..." `
-        -Status "Processed: $i of $($JpegData.Count)" `
-        -PercentComplete (($i / $JpegData.Count) * 100)
-
-    $SourcePath      = "$($_.Path)\$($_.FileName)"
-    If ($ForceDestination) { $DestinationDir = $DestinationRoot }
-    Else                   { $DestinationDir  = "$Base\$($_.Year)\$($month[[int]$($_.month)])" }
-    $DestinationFile = "$($_.$($_.Preferred))"
-    $Destination     = "$DestinationDir\$DestinationFile$($_.Extension)"
-
-    # Create dest dir if it doesn't exist and not Whatif
-    If (!(Test-Path $DestinationDir) -and (!$WhatIf)) { mkdir $DestinationDir | Out-Null }
-
-    If ($SourcePath -eq $Destination)
-    {
-        Write-Log "Skipping file because it is already properly named: $SourcePath"
-    }
-    ElseIf (Test-Path $Destination)
-    {
-        # Attempt to suffix up to 5
-        For ($j = 1; $j -le 5; $j++) {
-            # Iterate filename and check if exists.
-            $Destination = "$DestinationDir\$DestinationFile ($j)$($_.Extension)"
-            If (Test-Path $Destination)
-            {
-                # The file still exists after 5 iterations, skip to next file.
-                If ($j -eq 5)
+Try
+{
+    #$WhatIf=$true
+    
+    # Setup target destination for writing files later
+    If ($DestinationRoot) { $Base = $DestinationRoot }
+    Else                  { $Base = $SourceDir }
+    
+    # Add '\*' for gci -Include.
+    If ($SourceDir -notmatch "^[a-z]\:\\.*\\\*$") { $SourceDir = "$SourceDir\*" }
+    
+    # Retrieve data
+    If ($JpegData) { Remove-Variable JpegData }
+    If ($RecurseDir) { $JpegData = gci -Path $SourceDir -Include $Filter -Recurse | Get-JpegData }
+    Else             { $JpegData = gci -Path $SourceDir -Include $Filter          | Get-JpegData }
+    
+    $i = 0
+    $JpegData | % {
+        $i++
+        Write-Progress -Activity "Writing files..." `
+            -Status "Processed: $i of $($JpegData.Count)" `
+            -PercentComplete (($i / $JpegData.Count) * 100)
+    
+        $SourcePath      = "$($_.Path)\$($_.FileName)"
+        If ($ForceDestination) { $DestinationDir = $DestinationRoot }
+        Else                   { $DestinationDir  = "$Base\$($_.Year)\$($month[[int]$($_.month)])" }
+        $DestinationFile = "$($_.$($_.Preferred))"
+        $Destination     = "$DestinationDir\$DestinationFile$($_.Extension)"
+    
+        # Create dest dir if it doesn't exist and not Whatif
+        If (!(Test-Path $DestinationDir) -and (!$WhatIf)) { mkdir $DestinationDir | Out-Null }
+    
+        If ($SourcePath -eq $Destination)
+        {
+            Write-Log "Skipping file because it is already properly named: $SourcePath"
+        }
+        ElseIf (Test-Path $Destination)
+        {
+            # Attempt to suffix up to 5
+            For ($j = 1; $j -le 5; $j++) {
+                # Iterate filename and check if exists.
+                $Destination = "$DestinationDir\$DestinationFile ($j)$($_.Extension)"
+                If (Test-Path $Destination)
                 {
-                    If ($WhatIf) { Write-Log "$SourcePath,$Destination,ExistsAlready" -WhatIf ; Break }
-                    Else         { Write-Log "$SourcePath,$Destination,ExistsAlready"         ; Break }
-                }
-            }
-            Else
-            {
-                If ($WhatIf)
-                {
-                    Write-Log "$SourcePath,$Destination,$($_.Preferred)" -WhatIf
-                    Break
+                    # The file still exists after 5 iterations, skip to next file.
+                    If ($j -eq 5)
+                    {
+                        If ($WhatIf) { Write-Log "$SourcePath,$Destination,ExistsAlready" -WhatIf ; Break }
+                        Else         { Write-Log "$SourcePath,$Destination,ExistsAlready"         ; Break }
+                    }
                 }
                 Else
                 {
-                    # Write file and skip to next file.
-                    If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
-                    Else                   { Move-Item -Path $SourcePath -Destination $Destination }
-                    Write-Log "$SourcePath,$Destination,$($_.Preferred)"
-                    Break
+                    If ($WhatIf)
+                    {
+                        Write-Log "$SourcePath,$Destination,$($_.Preferred)" -WhatIf
+                        Break
+                    }
+                    Else
+                    {
+                        # Write file and skip to next file.
+                        If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
+                        Else                   { Move-Item -Path $SourcePath -Destination $Destination }
+                        Write-Log "$SourcePath,$Destination,$($_.Preferred)"
+                        Break
+                    }
                 }
             }
         }
-    }
-    Else
-    {
-        If ($WhatIf)
-        {
-            Write-Log "$SourcePath,$Destination,$($_.Preferred)" -WhatIf
-        }
         Else
         {
-            If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
-            Else                   { Move-Item -Path $SourcePath -Destination $Destination }
-            Write-Log "$SourcePath,$Destination,$($_.Preferred)"
+            If ($WhatIf)
+            {
+                Write-Log "$SourcePath,$Destination,$($_.Preferred)" -WhatIf
+            }
+            Else
+            {
+                If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
+                Else                   { Move-Item -Path $SourcePath -Destination $Destination }
+                Write-Log "$SourcePath,$Destination,$($_.Preferred)"
+            }
         }
     }
+}
+Catch
+{
+    Write-Log "ERROR: $($_.Exception.Message)"
+    Write-Log "ERROR: $($_.InvocationInfo.PositionMessage.Split('+')[0])"
 }
 #endregion
