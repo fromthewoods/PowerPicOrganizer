@@ -323,17 +323,20 @@ Try
     Else             { $JpegData = gci -Path $SourceDir -Include $Filter          | Get-JpegData }
     
     $i = 0
-    $JpegData | % {
+    Foreach ($item in $JpegData)
+    {
         $i++
-        Write-Progress -Activity "Writing files..." `
-            -Status "Processed: $i of $($JpegData.Count)" `
-            -PercentComplete (($i / $JpegData.Count) * 100)
-    
-        $SourcePath      = "$($_.Path)\$($_.FileName)"
+        If ($JpegData.Count -gt 1)
+        {
+            Write-Progress -Activity "Writing files..." `
+                -Status "Processed: $i of $($JpegData.Count)" `
+                -PercentComplete (($i / $JpegData.Count) * 100)
+        } 
+        $SourcePath      = "$($item.Path)\$($item.FileName)"
         If ($ForceDestination) { $DestinationDir = $DestinationRoot }
-        Else                   { $DestinationDir  = "$Base\$($_.Year)\$($month[[int]$($_.month)])" }
-        $DestinationFile = "$($_.$($_.Preferred))"
-        $Destination     = "$DestinationDir\$DestinationFile$($_.Extension)"
+        Else                   { $DestinationDir  = "$Base\$($item.Year)\$($month[[int]$($item.month)])" }
+        $DestinationFile = "$($item.$($item.Preferred))"
+        $Destination     = "$DestinationDir\$DestinationFile$($item.Extension)"
     
         # Create dest dir if it doesn't exist and not Whatif
         If (!(Test-Path $DestinationDir) -and (!$WhatIf)) { mkdir $DestinationDir | Out-Null }
@@ -347,7 +350,7 @@ Try
             # Attempt to suffix up to 5
             For ($j = 1; $j -le 5; $j++) {
                 # Iterate filename and check if exists.
-                $Destination = "$DestinationDir\$DestinationFile ($j)$($_.Extension)"
+                $Destination = "$DestinationDir\$DestinationFile ($j)$($item.Extension)"
                 If (Test-Path $Destination)
                 {
                     # The file still exists after 5 iterations, skip to next file.
@@ -361,7 +364,7 @@ Try
                 {
                     If ($WhatIf)
                     {
-                        Write-Log "$SourcePath,$Destination,$($_.Preferred)" -WhatIf
+                        Write-Log "$SourcePath,$Destination,$($item.Preferred)" -WhatIf
                         Break
                     }
                     Else
@@ -369,7 +372,7 @@ Try
                         # Write file and skip to next file.
                         If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
                         Else                   { Move-Item -Path $SourcePath -Destination $Destination }
-                        Write-Log "$SourcePath,$Destination,$($_.Preferred)"
+                        Write-Log "$SourcePath,$Destination,$($item.Preferred)"
                         Break
                     }
                 }
@@ -379,13 +382,13 @@ Try
         {
             If ($WhatIf)
             {
-                Write-Log "$SourcePath,$Destination,$($_.Preferred)" -WhatIf
+                Write-Log "$SourcePath,$Destination,$($item.Preferred)" -WhatIf
             }
             Else
             {
                 If ($PreserveOriginal) { Copy-Item -Path $SourcePath -Destination $Destination }
                 Else                   { Move-Item -Path $SourcePath -Destination $Destination }
-                Write-Log "$SourcePath,$Destination,$($_.Preferred)"
+                Write-Log "$SourcePath,$Destination,$($item.Preferred)"
             }
         }
     }
