@@ -14,39 +14,51 @@ BEGIN {
     {
         $null = [Reflection.Assembly]::LoadWithPartialName("PresentationCore");
         
-        function Get-ImageMetadata {
+        function Get-ImageMetadata
+        {
             PARAM([System.Windows.Media.Imaging.BitmapFrame]$bitmapFrame, [string]$path)
-            PROCESS {
-                if($path -is [string]) 
+            PROCESS 
+            {
+                Try
                 {
-                    ## To read metadata, you use GetQuery.  To write metadata, you use SetQuery
-                    ## To WRITE metadata, you need a writer, 
-                    ##    but first you have to open the file ReadWrite, instead of Read only
-                    #  $writer = $bitmapFrame.CreateInPlaceBitmapMetadataWriter();
-                    #  if ($writer.TrySave()){ 
-                    #     $writer.SetQuery("/tEXt/{str=Description}", "Have a nice day."); 
-                    #  } else {
-                    #    Write-Host "Couldn't save data" -Fore Red
-                    #  }
-                    $next=$bitmapFrame.MetaData.GetQuery($path);
-                    if($next.Location)
+                    #Write-Log $path
+                    if($path -is [string]) 
                     {
-                        $next | ForEach-Object { Get-ImageMetadata $bitmapFrame "$($next.Location)$_" }
+                        ## To read metadata, you use GetQuery.  To write metadata, you use SetQuery
+                        ## To WRITE metadata, you need a writer, 
+                        ##    but first you have to open the file ReadWrite, instead of Read only
+                        #  $writer = $bitmapFrame.CreateInPlaceBitmapMetadataWriter();
+                        #  if ($writer.TrySave()){ 
+                        #     $writer.SetQuery("/tEXt/{str=Description}", "Have a nice day."); 
+                        #  } else {
+                        #    Write-Host "Couldn't save data" -Fore Red
+                        #  }
+                        $next=$bitmapFrame.MetaData.GetQuery($path);
+                        if($next.Location)
+                        {
+                            $next | ForEach-Object { Get-ImageMetadata $bitmapFrame "$($next.Location)$_" }
+                        } 
+                        else 
+                        {
+                            if($path.Split("/")[-1] -match "{ushort=(?<code>\d+)}") 
+                            {
+                                # $path = "0x{0:X}" -f [int]$matches["code"]
+                                $path = [int]$matches["code"]
+                            }
+                            Add-Member -in ($Global:ImageMetaData) -Type NoteProperty -Name $path -value $next -Force
+                            # @{$path=$next}
+                        }
                     } 
                     else 
                     {
-                        if($path.Split("/")[-1] -match "{ushort=(?<code>\d+)}") 
-                        {
-                            # $path = "0x{0:X}" -f [int]$matches["code"]
-                            $path = [int]$matches["code"]
-                        }
-                        Add-Member -in ($Global:ImageMetaData) -Type NoteProperty -Name $path -value $next -Force
-                        # @{$path=$next}
+                        $bitmapFrame.Metadata | ForEach-Object { Get-ImageMetadata $bitmapFrame $_ }
                     }
-                } 
-                else 
+                }
+                Catch
                 {
-                    $bitmapFrame.Metadata | ForEach-Object { Get-ImageMetadata $bitmapFrame $_ }
+                    Write-Log "ERROR: $($_.Exception.Message)"
+                    Write-Log "ERROR: $($_.InvocationInfo.PositionMessage.Split('+')[0])"
+                    #Write-Log $path
                 }
             }
         }
@@ -78,7 +90,10 @@ PROCESS
         & {
             $decoder = [System.Windows.Media.Imaging.BitmapDecoder]::Create( $stream, "None", "Default" )
             $bitmapFrame = $decoder.Frames[0];
-            $bitmapFrame.Metadata | ForEach-Object { Get-ImageMetadata $bitmapFrame $_ }
+            $bitmapFrame.Metadata | ForEach-Object {
+                #Write-Log $_
+                Get-ImageMetadata $bitmapFrame $_ 
+            }
         }
         trap 
         { 
