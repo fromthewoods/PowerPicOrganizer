@@ -309,19 +309,29 @@ $dependencies | % {
 Try
 {
     #$WhatIf=$true
-    
+    If ($JpegData) { Remove-Variable JpegData }
     # Setup target destination for writing files later
     If ($DestinationRoot) { $Base = $DestinationRoot }
     Else                  { $Base = $SourceDir }
     
+    # Check to see if * (wildcard) is used in source path
+    If ($SourceDir -match "^[a-z]\:\\.*\\.*\*.*$")
+    {
+        # Retrieve data
+        If ($RecurseDir) { $JpegData = gci -Path $SourceDir -Recurse | Get-JpegData }
+        Else             { $JpegData = gci -Path $SourceDir          | Get-JpegData }
+    }
     # Add '\*' for gci -Include.
-    If ($SourceDir -notmatch "^[a-z]\:\\.*\\\*$") { $SourceDir = "$SourceDir\*" }
-    
-    # Retrieve data
-    If ($JpegData) { Remove-Variable JpegData }
-    If ($RecurseDir) { $JpegData = gci -Path $SourceDir -Include $Filter -Recurse | Get-JpegData }
-    Else             { $JpegData = gci -Path $SourceDir -Include $Filter          | Get-JpegData }
-    
+    ElseIf ($SourceDir -notmatch "^[a-z]\:\\.*\\\*$")
+    {
+        $SourceDir = "$SourceDir\*"
+        # Retrieve data
+        If ($RecurseDir) { $JpegData = gci -Path $SourceDir -Include $Filter -Recurse | Get-JpegData }
+        Else             { $JpegData = gci -Path $SourceDir -Include $Filter          | Get-JpegData }
+    }
+    Else { Throw "Invalid source path: $SourceDir" }
+   
+    # Process the files
     $i = 0
     Foreach ($item in $JpegData)
     {
