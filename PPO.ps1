@@ -41,7 +41,7 @@ Param
     [switch]$SkipDupeFile
 ,
     # File types to -Include.
-    $Filter = @("*.jpg","*.jpeg","*.mov","*.mpg","*.mp4","*.avi")
+    $Filter = @("*.jpg","*.jpeg","*.mov","*.mpg","*.mp4","*.avi","*.NEF")
 ,
     $Global:isDebug = $true
 ,
