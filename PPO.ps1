@@ -14,9 +14,11 @@ Param
     # The source directory of the files. The * is required for -Include
     [Parameter(Mandatory=$true,Position=0)]
     #[ValidatePattern("^[a-z]\:\\.*\\\*$")] # Check for Drive letter and ending in '*'.
+    [Alias('S')]
     [string]$SourceDir
 ,
     # The target location for writing files to.
+    [Alias('D')]
     [Parameter(Mandatory=$false,Position=1)][string]$DestinationRoot
 ,
     [string]$LogsDir
@@ -33,6 +35,10 @@ Param
 ,
     # Verify changes before performing them
     [switch]$WhatIf
+,
+    # If the target file exists (not full path) skip it. This is different than if the
+    # entire source path matches the dest path.
+    [switch]$SkipDupeFile
 ,
     # File types to -Include.
     $Filter = @("*.jpg","*.jpeg","*.mov","*.mpg","*.mp4","*.avi")
@@ -354,6 +360,11 @@ Try
         If ($SourcePath -eq $Destination)
         {
             Write-Log "Skipping file because it is already properly named: $SourcePath"
+        }
+        ElseIf ((Test-Path $Destination) -and $SkipDupeFile)
+        { 
+            Write-Log "SKIP $SourcePath,$Destination SKIP"
+            Continue
         }
         ElseIf (Test-Path $Destination)
         {
