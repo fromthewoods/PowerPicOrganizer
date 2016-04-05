@@ -281,6 +281,7 @@ function Get-DateTaken {
 
 #region ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Push-Location
 #Locate the invocation directory and cd to it to be able to load local functions.
 $parentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $includesDir = "$parentDir\"
@@ -419,4 +420,5 @@ Catch
     Write-Log "ERROR: $($_.Exception.Message)"
     Write-Log "ERROR: $($_.InvocationInfo.PositionMessage.Split('+')[0])"
 }
+Pop-Location
 #endregion
