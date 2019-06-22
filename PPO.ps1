@@ -19,7 +19,8 @@ Param
 
   # The target location for writing files to.
   [Alias('D')]
-  [Parameter(Mandatory = $false, Position = 1)][string]$DestinationRoot,
+  [Parameter(Mandatory = $false, Position = 1)]
+  [string]$DestinationRoot,
 
   [string]$LogsDir = $PSScriptRoot,
 
@@ -45,29 +46,6 @@ Param
 
   $Global:isDebug = $true
 )
-
-$PSDefaultParameterValues = @{
-  "Write-Log:DebugMode" = $true
-  "Write-Log:LogFile"   = $LogsDir
-}
-
-# Include local config and functions.
-$dependencies = @("..\Write-log\Write-Log.psd1")
-
-$month = @{
-  01 = "01 Jan"
-  02 = "02 Feb"
-  03 = "03 Mar"
-  04 = "04 Apr"
-  05 = "05 May"
-  06 = "06 Jun"
-  07 = "07 Jul"
-  08 = "08 Aug"
-  09 = "09 Sep"
-  10 = "10 Oct"
-  11 = "11 Nov"
-  12 = "12 Dec"
-}
 
 function Get-JpegData {
   <#
@@ -265,7 +243,31 @@ function Get-DateTaken {
 
 #region ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+$PSDefaultParameterValues = @{
+  "Write-Log:DebugMode" = $true
+  "Write-Log:LogFile"   = $LogsDir
+}
+
+# Include local config and functions.
+$dependencies = @("..\Write-log\Write-Log.psd1")
+
+$month = @{
+  01 = "01 Jan"
+  02 = "02 Feb"
+  03 = "03 Mar"
+  04 = "04 Apr"
+  05 = "05 May"
+  06 = "06 Jun"
+  07 = "07 Jul"
+  08 = "08 Aug"
+  09 = "09 Sep"
+  10 = "10 Oct"
+  11 = "11 Nov"
+  12 = "12 Dec"
+}
+
 Push-Location
+
 #Locate the invocation directory and cd to it to be able to load local functions.
 $parentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $includesDir = "$parentDir\"
