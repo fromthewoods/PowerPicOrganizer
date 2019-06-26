@@ -8,13 +8,15 @@
 ##  - v1.0  - First release, retrieves all the data and stacks it somehow onto a FileInfo object
 #####################################################################################################
 # filter Get-ImageMetadata {
+function Get-ImageMetaData {
+
 PARAM($file)
 BEGIN {
     Try
     {
         $null = [Reflection.Assembly]::LoadWithPartialName("PresentationCore");
         
-        function Get-ImageMetadata
+        function Get-ImageMetadataInt
         {
             PARAM([System.Windows.Media.Imaging.BitmapFrame]$bitmapFrame, [string]$path)
             PROCESS 
@@ -36,7 +38,7 @@ BEGIN {
                         $next=$bitmapFrame.MetaData.GetQuery($path);
                         if($next.Location)
                         {
-                            $next | ForEach-Object { Get-ImageMetadata $bitmapFrame "$($next.Location)$_" }
+                            $next | ForEach-Object { Get-ImageMetadataInt $bitmapFrame "$($next.Location)$_" }
                         } 
                         else 
                         {
@@ -51,7 +53,7 @@ BEGIN {
                     } 
                     else 
                     {
-                        $bitmapFrame.Metadata | ForEach-Object { Get-ImageMetadata $bitmapFrame $_ }
+                        $bitmapFrame.Metadata | ForEach-Object { Get-ImageMetadataInt $bitmapFrame $_ }
                     }
                 }
                 Catch
@@ -92,7 +94,7 @@ PROCESS
             $bitmapFrame = $decoder.Frames[0];
             $bitmapFrame.Metadata | ForEach-Object {
                 #Write-Log $_
-                Get-ImageMetadata $bitmapFrame $_ 
+                Get-ImageMetadataInt $bitmapFrame $_ 
             }
         }
         trap 
@@ -111,4 +113,5 @@ PROCESS
         Write-Log "ERROR: $($_.Exception.Message)"
         Write-Log "ERROR: $($_.InvocationInfo.PositionMessage.Split('+')[0])"
     }
+}
 }
