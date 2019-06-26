@@ -50,12 +50,15 @@ Param
 #region ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 $PSDefaultParameterValues = @{
-  "Write-Log:DebugMode" = $true
-  "Write-Log:LogFile"   = $LogsDir
+  "Write-Log:Verbose" = $true
+  "Write-Log:LogFile" = Join-Path $LogsDir 'ppo.log'
 }
 
 # Include local config and functions.
-$dependencies = @("..\Write-log\Write-Log.psd1")
+$dependencies = @(
+  "..\..\..\Write-log\Write-Log.psd1"
+  "..\PsPhotoOrganizer.psd1"
+)
 
 $month = @{
   01 = "01 Jan"
@@ -89,13 +92,14 @@ $Global:log = @{
 $logFile = $log.Location + $log.Name + $log.Extension
 
 # Source local config and functions using call operator (dot sourcing)
-$dependencies | % {
-  If (Test-Path ".\$_") {
-    Import-Module ".\$_"
-    Write-Verbose "$(Get-Date) Loaded dependency: $_" #| Tee-Object -FilePath $logFile -Append
+$dependencies | ForEach-Object {
+  $dependency = Resolve-Path $_
+  try {
+    Write-Verbose "$(Get-Date) Loading dependency: $dependency" #| Tee-Object -FilePath $logFile -Append
+    Import-Module $dependency -ErrorAction Stop -Force
   }
-  Else {
-    Write-Warning "$(Get-Date) ERROR: Failed to load dependency: $_" #| Tee-Object -FilePath $logFile -Append
+  catch {
+    Write-Warning "$(Get-Date) ERROR: Failed to load dependency: $dependency" #| Tee-Object -FilePath $logFile -Append
     Exit 1
   }
 }
