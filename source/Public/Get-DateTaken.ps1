@@ -22,7 +22,7 @@ function Get-DateTaken {
 
   Try {
     #Write-Log $file
-    $ImageMetaData = .\Get-ImageMetaData.ps1 -file $file
+    $ImageMetaData = Get-ImageMetaData -file $file
 
     # ExifDTOrig (0x9003): Date and time when the original image data was generated. For a DSC, the date 
     # and time when the picture was taken. The format is YYYY:MM:DD HH:MM:SS with time shown in 24-hour 
