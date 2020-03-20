@@ -3,7 +3,7 @@ $sut = (Split-Path -Leaf $MyInvocation.MyCommand.Path) -replace '\.Tests\.', '.'
 . "$here\..\Public\$sut"
 
 Describe "Get-Images" {
-    It "does something useful" {
-        $true | Should -Be $false
-    }
+  It "does something useful" {
+    $true | Should -Be $false
+  }
 }
