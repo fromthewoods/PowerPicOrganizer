@@ -79,7 +79,8 @@ function Get-Images {
   Param(
     [Parameter(Mandatory = $true, Position = 0)]
     [ValidateScript( { (Test-Path -Path $_) })]
-    [String[]]$Source, 
+    [String[]]$Source,
+
     [Parameter(Mandatory = $false, Position = 1)]
     [String[]]$Extension = @('.jpg', '.gif')
   )
@@ -88,14 +89,14 @@ function Get-Images {
   # Get folder list
   $Folders = @()
   $Duration = Measure-Command { 
-    $Source | % { $Folders += (Get-ChildItem -Path $Source -Recurse -Directory -Force).FullName }
+    $Source | ForEach-Object { $Folders += (Get-ChildItem -Path $Source -Recurse -Directory -Force).FullName }
   }
   Write-Verbose "Got '$($Folders.Count)' folder(s) in $($Duration.Minutes):$($Duration.Seconds) mm:ss"
   $Folders += $Source
 
   $Images = @()
   $objShell = New-Object -ComObject Shell.Application
-  $Folders | % {
+  $Folders | ForEach-Object {
 
     $objFolder = $objShell.namespace($_)
     foreach ($File in $objFolder.items()) { 
