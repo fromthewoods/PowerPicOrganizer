@@ -22,6 +22,7 @@ function Get-ImageData {
     Add-Type -AssemblyName System.Drawing
     $imageExtensions = @(
       '.jpg'
+      '.jpeg'
     )
   }
   Process {
@@ -35,8 +36,8 @@ function Get-ImageData {
 
         if ($byteArray) {
           $string = [System.Text.Encoding]::ASCII.GetString($byteArray)
-          $exactDate = [datetime]::ParseExact($string, "yyyy:MM:dd HH:mm:ss`0", $Null)
-          return $exactDate
+          $dateObject = [datetime]::ParseExact($string, "yyyy:MM:dd HH:mm:ss`0", $Null)
+          return $dateObject
         }
       }
       catch {
@@ -46,7 +47,7 @@ function Get-ImageData {
         Write-Verbose "ERROR: [$message]"
         Write-Verbose "ERROR: [$position]"
         Write-Warning "Could not extract EXIF 'DateTaken'. Falling back to file 'lastWriteTime'."
-        # Throw $_
+        return $fileObj.LastWriteTime
       }
     }
     else {
