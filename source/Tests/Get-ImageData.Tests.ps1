@@ -2,7 +2,7 @@
 $sut = (Split-Path -Leaf $MyInvocation.MyCommand.Path) -replace '\.Tests\.', '.'
 . "$here\..\Public\$sut"
 
-Describe "Get-ImageData" {
+Describe -Name "Get-ImageData" -Fixture {
   It -Name 'should exist' -Test {
     Get-Command -Name 'Get-ImageData' -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
   }
