@@ -20,9 +20,9 @@ Describe "Get-ImageData" {
     }
 
     It -Name 'should fall back to lastwritetime if bitmap fails' -Test {
-      Mock -CommandName New-Object -MockWith { Throw 'Failed'}
+      Mock -CommandName New-Object -MockWith { Throw 'Failed' }
       Mock -CommandName Write-Warning -MockWith { }
-      $actual = Get-ImageData -FileName $testFile -Verbose
+      $actual = Get-ImageData -FileName $testFile
       $expected = (Get-Item -Path $testFile).LastWriteTime
 
       $actual | Should -Be $expected
