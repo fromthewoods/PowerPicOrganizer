@@ -44,4 +44,13 @@ Describe "Get-ImageData" {
     }
   }
 
+  Context -Name 'Input' -Fixture {
+    $testFiles = @(
+      "$here\Resources\Images\video.mkv"
+      "$here\Resources\Images\2020-03-01 13.53.42.jpg"
+    )
+    It -Name 'should support valuefrompipeline' -Test {
+      ($testFiles | Get-ImageData).Count | Should -Be 2
+    }
+  }
 }

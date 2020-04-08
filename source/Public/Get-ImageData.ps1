@@ -9,13 +9,13 @@ function Get-ImageData {
     .EXAMPLE
       Example here
   #>
-  [CmdletBinding(SupportsShouldProcess = $True)]
-  [OutputType([object])]
+  [CmdletBinding()]
+  [OutputType([datetime])]
   Param (
     [Parameter(Mandatory = $true,
-      ValueFromPipelineByPropertyName = $false,
+      ValueFromPipeline = $true,
       Position = 0)]
-    [string[]]$FileName
+    [string]$FileName
   )
 
   Begin {
