@@ -9,14 +9,14 @@ Describe "Get-ImageData" {
 
   Context -Name 'Image' -Fixture {
     $testFile = "$here\Resources\Images\2020-03-01 13.53.42.jpg"
-    $actual = Get-ImageData -FileName $testFile -Verbose
+    $actual = Get-ImageData -FileName $testFile
 
-    It -Name 'returns DateTime Object' -Test {
-      $actual.GetType().Name | Should -Be 'DateTime'
+    It -Name 'should return a pscustomobject' -Test {
+      $actual.GetType().Name | Should -Be 'PSCustomObject'
     }
 
     It -Name "returns exif date taken for image" -Test {
-      $actual | Should -BeLike '*13:53:42*'
+      $actual.DateTaken | Should -BeLike '*13:53:42*'
     }
 
     It -Name 'should fall back to lastwritetime if bitmap fails' -Test {
@@ -25,7 +25,7 @@ Describe "Get-ImageData" {
       $actual = Get-ImageData -FileName $testFile
       $expected = (Get-Item -Path $testFile).LastWriteTime
 
-      $actual | Should -Be $expected
+      $actual.DateTaken | Should -Be $expected
       Assert-MockCalled -CommandName Write-Warning -Times 1 -Exactly
     }
   }
@@ -35,12 +35,12 @@ Describe "Get-ImageData" {
     $actual = Get-ImageData -FileName $testFile -Verbose
     $expected = (Get-Item -Path $testFile).LastWriteTime
 
-    It -Name 'returns DateTime Object' -Test {
-      $actual.GetType().Name | Should -Be 'DateTime'
+    It -Name 'should return a pscustomobject' -Test {
+      $actual.GetType().Name | Should -Be 'PSCustomObject'
     }
 
     It -Name "returns lastwritetime for non image" -Test {
-      $actual | Should -Be $expected
+      $actual.DateTaken | Should -Be $expected
     }
   }
 

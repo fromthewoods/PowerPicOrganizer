@@ -10,7 +10,7 @@ function Get-ImageData {
       Example here
   #>
   [CmdletBinding()]
-  [OutputType([datetime])]
+  [OutputType([object])]
   Param (
     [Parameter(Mandatory = $true,
       ValueFromPipeline = $true,
@@ -31,22 +31,28 @@ function Get-ImageData {
       try {
         $bitMap = New-Object System.Drawing.Bitmap($FileName)
 
-        $byteArray = $bitMap.GetPropertyItem(36867).Value # Date Taken
+        $dateTakenByteArray = $bitMap.GetPropertyItem(36867).Value # Date Taken
         $bitMap.Dispose()
 
-        if ($byteArray) {
-          $string = [System.Text.Encoding]::ASCII.GetString($byteArray)
+        if ($dateTakenByteArray) {
+          $string = [System.Text.Encoding]::ASCII.GetString($dateTakenByteArray)
           $dateObject = [datetime]::ParseExact($string, "yyyy:MM:dd HH:mm:ss`0", $Null)
-          return $dateObject
+          return [PSCustomObject]@{
+            DateTaken = $dateObject
+          }
         }
       }
       catch {
         Write-Warning "Could not extract EXIF 'DateTaken'. Falling back to file 'lastWriteTime'."
-        return $fileObj.LastWriteTime
+        return [PSCustomObject]@{
+          DateTaken = $fileObj.LastWriteTime
+        }
       }
     }
     else {
-      return $fileObj.LastWriteTime
+      return [PSCustomObject]@{
+        DateTaken = $fileObj.LastWriteTime
+      }
     }
   }
   End {
