@@ -41,11 +41,6 @@ function Get-ImageData {
         }
       }
       catch {
-        # Custom message here Write-Verbose
-        $message = $_.Exception.Message
-        $position = $_.InvocationInfo.PositionMessage.Split('+')[0]
-        Write-Verbose "ERROR: [$message]"
-        Write-Verbose "ERROR: [$position]"
         Write-Warning "Could not extract EXIF 'DateTaken'. Falling back to file 'lastWriteTime'."
         return $fileObj.LastWriteTime
       }
